@@ -77,4 +77,11 @@ If `australiaeast` is refused (some student subscriptions limit regions), use `e
 
 ## Results
 
-<!-- TODO(Nhi): after running the eval, e.g. "11/12 eval cases pass; the agent cites a source in every answer." -->
+Live API: `https://ask-nhi-agent.purpleglacier-190005c1.australiaeast.azurecontainerapps.io` (`/health`, `POST /ask`, `POST /match`, docs at `/docs`).
+
+**12/12** on the 12-question eval set (Nov 2026). Each answer is checked for: citing the right source, mentioning the key facts, calling Nhi by name, no "the sources don't say…" filler, and declining off-topic, private or prompt-injection questions.
+
+What the eval caught along the way:
+- A single search missed Nhi's security work, so the agent answered "no security project". Fix: the prompt now asks for 2–3 differently worded searches on broad questions.
+- The agent referred to Nhi as "her". Fix: a prompt rule plus an automatic pronoun check.
+- A dropped connection ended an answer. Fix: searches retry up to 3 times and tool errors are logged.
