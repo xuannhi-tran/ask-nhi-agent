@@ -70,3 +70,27 @@ def test_tool_error_reaches_model_instead_of_crashing(monkeypatch):
     )
     result = ask("Has Nhi used PostgreSQL?", build_graph(llm))
     assert result["answer"] == "Search is unavailable right now."
+
+
+def test_search_retries_then_succeeds(monkeypatch):
+    calls = []
+
+    def flaky(query, k):
+        calls.append(1)
+        if len(calls) < 3:
+            raise ConnectionError("connection reset")
+        return FAKE_INDEX
+
+    monkeypatch.setattr(retrieval, "_search_once", flaky)
+    monkeypatch.setattr(retrieval.time, "sleep", lambda s: None)
+    assert retrieval.search("postgres") == FAKE_INDEX
+    assert len(calls) == 3
+
+
+def test_search_gives_up_after_attempts(monkeypatch):
+    import pytest
+
+    monkeypatch.setattr(retrieval, "_search_once", lambda q, k: (_ for _ in ()).throw(ConnectionError("down")))
+    monkeypatch.setattr(retrieval.time, "sleep", lambda s: None)
+    with pytest.raises(ConnectionError):
+        retrieval.search("postgres")

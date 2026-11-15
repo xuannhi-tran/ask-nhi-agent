@@ -1,10 +1,14 @@
 """Search Nhi's portfolio chunks in Supabase pgvector (the same index Ask Nhi uses)."""
 
 import json
+import logging
+import time
 from dataclasses import dataclass
 from functools import lru_cache
 
 from . import config
+
+log = logging.getLogger(__name__)
 
 
 @dataclass
@@ -37,7 +41,19 @@ def embed_query(text: str) -> tuple[float, ...]:
     return tuple(result.embeddings[0])
 
 
-def search(query: str, k: int = config.TOP_K) -> list[Chunk]:
+def search(query: str, k: int = config.TOP_K, attempts: int = 3) -> list[Chunk]:
+    """Search with a short retry: a dropped connection or a rate limit shouldn't end the answer."""
+    for attempt in range(1, attempts + 1):
+        try:
+            return _search_once(query, k)
+        except Exception as e:  # network, rate limit, Supabase hiccup
+            log.warning("search attempt %d/%d failed: %s: %s", attempt, attempts, type(e).__name__, e)
+            if attempt == attempts:
+                raise
+            time.sleep(1.5 * attempt)
+
+
+def _search_once(query: str, k: int) -> list[Chunk]:
     # match_chunks is defined in portfolio-v3/supabase/rag.sql; pgvector takes the vector as text.
     rows = (
         _supabase()
